@@ -1,0 +1,129 @@
+---
+title: "Practical Machine Learning Final Project"
+author: "Anthony Del Signore"
+date: "12/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The complied data, which acts as the source for this analysis, contains quantified indicators of how well several participants performed multiple exercises. Much of the data was compiled using several fitness devices. Each participant was asked to perform barbell lifts correctly and incorrectly five different ways, as indicated by the "classe" variable. The goal of this project is to predict "classe" using other variables contained within the datasets.
+
+This analysis examines the following questions:
+1) How I built the model. Specifically, what algorithm is best suited to predict, accurately, classe on a set of 20 test cases.
+2) How I used cross-validation techniques.
+3) Ascertain expected out of sample error.
+
+Also, I provide some insight at moments to show my thought process behind the choices I made.
+
+Finally, I provide a figure in the appendix for consideration.
+
+**Loading Packages, Loading Data, and Cleaning** 
+
+The first step is to load the following packages. Through the four weeks of this course, I believe these packages would be the most helpful for my analysis. 
+
+``` {r}
+library(caret); library(rpart); library(rpart.plot); library(rattle); library(randomForest);library(e1071); library(ggplot2)
+
+```
+
+I set the seed for future replication, though it is beyond the scope of this assignment.
+
+```{r}
+set.seed(100)
+```
+
+Next I loaded the training data and removed several columns from consideration. At first, I left all of the columns in my analysis. However, an error kept occurring which said the date format on two of the variables was incorrect.
+
+```{r}
+#Read training data and change all NAs to NA strings
+dat <- read.csv("/Users/delsiaj/Desktop/Data Science Course/pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+dat1 <- dat[,8:length(colnames(dat))]
+
+#Remove NAs
+dat_clean <- dat1[, colSums(is.na(dat1)) == 0]
+```
+
+**Training the Data and Exploratory Analysis**
+Next, I trained the data as shown below and sliced it into cross-validation sets.
+
+```{r}
+#Create data partitions
+inTrain <- createDataPartition(dat_clean$classe, p=0.7, list=FALSE)
+
+training <- dat_clean[inTrain, ]; testing <- dat_clean[-inTrain,]
+dim(training); dim(testing)
+```
+
+Because the exploratory analysis was unfruitful, I decided to go with a Random Forest model as it selects the important variables to use for its analysis. Similarly, it grows a large number of "trees" and votes on the one that performs the best. OVerfitting can be a problem with this method. However, the use of cross-validation asuages that issue. Thus, I apply five-fold cross-validation. Also, this will help the model perform well on the test data.
+
+``` {r}
+#Defining and Training the Model
+
+model1 <- train(classe ~ ., data=training, method="rf", trControl = trainControl(method="cv"), number=5)
+
+model1
+
+```
+
+
+**Predictions**
+Next, I test the model's performance on the training data against that of the validation set. 
+
+```{r}
+#Predictions
+model_pred <- predict(model1, testing)
+confusionMatrix(testing$classe, model_pred)
+
+#Overall Accuracy and Out of Sample Error
+acc <- postResample(model_pred, testing$classe)
+acc1 <- acc[1]
+
+sample_error <- 1 - as.numeric(confusionMatrix(testing$classe, model_pred)$overall[1])
+
+acc1
+sample_error
+```
+
+These predictions help determine accuracy and out-of-sample error.
+
+**Application to Test Data**
+Finally, the model is used on the test data to predict the classe of each of the 20 observations.
+
+``` {r}
+#Apply to the test CSV
+dat_test <- read.csv("/Users/delsiaj/Desktop/Data Science Course/pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+dat_test_clean <- dat_test[, colSums(is.na(dat_test)) == 0]
+dat_test_clean1 <- dat_test_clean[,8:length(colnames(dat_test_clean))]
+
+test_pred <- predict(model1,dat_test_clean1[, -length(names(dat_test_clean1))])
+
+test_pred
+
+```
+
+**Apendix - Tree Visualization**
+This data visualization shows that a tree with a **maxdepth** of 15 is suitable for proper classification.
+
+```{r}
+#Tree Visualization
+library(rpart.plot)
+tree <- rpart(classe ~ ., data=training, method="class", maxdepth=15)
+fancyRpartPlot(tree)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
